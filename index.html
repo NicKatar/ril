@@ -23,7 +23,6 @@
     z-index: 10;
     background: #000;
     cursor: pointer;
-    transition: background-color 0ms;
   }
 
   #flash.hidden { display: none; }
@@ -74,8 +73,8 @@
 <video id="video"
        src="video.mp4"
        playsinline
-       preload="auto"
-       crossorigin="anonymous"></video>
+       preload="auto"></video>
+<div id="hint">[ нажмите в любом месте ]</div>
 
 <script>
 (function () {
@@ -85,72 +84,67 @@
   const video = document.getElementById("video");
   const hint  = document.getElementById("hint");
 
-  /* ---------- 1. Мигание чёрный ↔ белый ---------- */
+  // Диагностика: увидим в консоли, что видео вообще загружается
+  video.addEventListener("error", () => {
+    console.error("Ошибка видео:", video.error);
+  });
+  video.addEventListener("loadedmetadata", () => {
+    console.log("Видео загружено:", video.videoWidth + "x" + video.videoHeight, video.duration + "s");
+  });
+
+  /* ---------- 1. Мигание ---------- */
 
   let flashing = true;
 
-  // Базовый период ~200мс => ~2.5 полных цикла в секунду (безопаснее порога).
-  // Плюс небольшая случайная добавка, чтобы ощущалось "сломанным", а не как строб.
   function scheduleFlash() {
     if (!flashing) return;
-
     const isWhite = flash.dataset.state !== "white";
     flash.style.backgroundColor = isWhite ? "#ffffff" : "#000000";
     flash.dataset.state = isWhite ? "white" : "black";
-
     const base = 180;
-    const jitter = Math.random() * 90;      // 0–90 мс
-    const occasionalPause = Math.random() < 0.04 ? 400 : 0; // редкий "сбой"
+    const jitter = Math.random() * 90;
+    const occasionalPause = Math.random() < 0.04 ? 400 : 0;
     setTimeout(scheduleFlash, base + jitter + occasionalPause);
   }
   scheduleFlash();
 
-  /* ---------- 2. Аудио через Web Audio (важно для iOS) ---------- */
+  /* ---------- 2. Аудио ---------- */
 
   let audioCtx = null;
-  let gainNode = null;
-  let sourceNode = null;
 
   function setupAudio() {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       audioCtx = new AC();
-      sourceNode = audioCtx.createMediaElementSource(video);
-      gainNode = audioCtx.createGain();
+      const sourceNode = audioCtx.createMediaElementSource(video);
+      const gainNode   = audioCtx.createGain();
       gainNode.gain.value = 1.0;
       sourceNode.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
-      }
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
     } catch (e) {
       console.warn("WebAudio недоступен:", e);
       audioCtx = null;
     }
   }
 
-  /* ---------- 3. Fullscreen + ориентация ---------- */
+  /* ---------- 3. Fullscreen ---------- */
 
   function requestFullscreen() {
     const el = document.documentElement;
     try {
       if (el.requestFullscreen)            el.requestFullscreen().catch(() => {});
       else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      else if (el.mozRequestFullScreen)    el.mozRequestFullScreen();
-      else if (el.msRequestFullscreen)     el.msRequestFullscreen();
-    } catch (e) { /* ignore */ }
-
+    } catch (e) {}
     try {
       if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock("landscape").catch(() => {});
-      } else if (screen.lockOrientation) {
-        screen.lockOrientation("landscape");
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {}
   }
 
-  /* ---------- 4. Активация по первому действию ---------- */
+  /* ---------- 4. Активация ---------- */
 
   let activated = false;
 
@@ -162,21 +156,15 @@
       document.removeEventListener(name, activate, true);
     });
 
-    // 1) Fullscreen — синхронно внутри жеста
     requestFullscreen();
 
-    // 2) Останавливаем мигание
     flashing = false;
     flash.classList.add("hidden");
-    hint.style.display = "none";
+    if (hint) hint.style.display = "none";   // ← null-safe
 
-    // 3) Показываем видео
     video.classList.add("active");
-
-    // 4) Настраиваем аудио ДО play()
     setupAudio();
 
-    // 5) Полная громкость и запуск
     video.muted  = false;
     video.volume = 1.0;
 
@@ -190,11 +178,11 @@
             video.muted = false;
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
           }, 50);
-        }).catch(() => {});
+        }).catch(e => console.error("Повторный play() не удался:", e));
       });
     }
 
-    // video.loop = true; // раскомментируйте, если нужно зацикливание
+    // video.loop = true;
   }
 
   const ACTION_EVENTS = [
@@ -207,8 +195,7 @@
     document.addEventListener(name, activate, { capture: true, passive: true });
   });
 
-  /* ---------- 5. Предзагрузка видео ---------- */
-  try { video.load(); } catch (e) { /* ignore */ }
+  try { video.load(); } catch (e) {}
 
 })();
 </script>
