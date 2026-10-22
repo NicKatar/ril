@@ -15,6 +15,7 @@
     touch-action: none;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    -webkit-user-select: none;
   }
 
   #flash {
@@ -44,12 +45,26 @@
     opacity: 1;
     pointer-events: auto;
   }
+
+  /* Скрываем ВСЕ элементы управления видео — нет кнопки выхода */
+  #video::-webkit-media-controls,
+  #video::-webkit-media-controls-enclosure,
+  #video::-webkit-media-controls-panel,
+  #video::-webkit-media-controls-play-button,
+  #video::-webkit-media-controls-fullscreen-button,
+  #video::-webkit-media-controls-start-playback-button,
+  #video::-webkit-media-controls-overlay-play-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  #video::-moz-media-controls { display: none !important; }
 </style>
 </head>
 <body>
 
 <div id="flash" aria-hidden="true"></div>
-
 <video id="video"
        src="video.mp4"
        playsinline
@@ -62,117 +77,219 @@
   const flash = document.getElementById("flash");
   const video = document.getElementById("video");
 
-  video.addEventListener("error", function () {
-    console.error("Ошибка видео:", video.error);
-  });
-  video.addEventListener("loadedmetadata", function () {
+  video.addEventListener("error", () => console.error("Ошибка видео:", video.error));
+  video.addEventListener("loadedmetadata", () => {
     console.log("Видео загружено:", video.videoWidth + "x" + video.videoHeight, video.duration + "s");
   });
 
-  /* ---------- Мигание чёрный ↔ белый ---------- */
+  /* ---------- 1. Мигание ---------- */
 
-  var flashing = true;
+  let flashing = true;
 
   function scheduleFlash() {
     if (!flashing) return;
-    var isWhite = flash.dataset.state !== "white";
+    const isWhite = flash.dataset.state !== "white";
     flash.style.backgroundColor = isWhite ? "#ffffff" : "#000000";
     flash.dataset.state = isWhite ? "white" : "black";
-    var base = 180;
-    var jitter = Math.random() * 90;
-    var occasionalPause = Math.random() < 0.04 ? 400 : 0;
+    const base = 180;
+    const jitter = Math.random() * 90;
+    const occasionalPause = Math.random() < 0.04 ? 400 : 0;
     setTimeout(scheduleFlash, base + jitter + occasionalPause);
   }
   scheduleFlash();
 
-  /* ---------- Аудио через Web Audio ---------- */
+  /* ---------- 2. Аудио ---------- */
 
-  var audioCtx = null;
+  let audioCtx = null;
 
   function setupAudio() {
     try {
-      var AC = window.AudioContext || window.webkitAudioContext;
+      const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       audioCtx = new AC();
-      var sourceNode = audioCtx.createMediaElementSource(video);
-      var gainNode = audioCtx.createGain();
+      const sourceNode = audioCtx.createMediaElementSource(video);
+      const gainNode = audioCtx.createGain();
       gainNode.gain.value = 1.0;
       sourceNode.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      if (audioCtx.state === "suspended") audioCtx.resume().catch(function () {});
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
     } catch (e) {
       console.warn("WebAudio недоступен:", e);
       audioCtx = null;
     }
   }
 
-  /* ---------- Fullscreen + ориентация ---------- */
+  /* ---------- 3. Агрессивный fullscreen ---------- */
 
-  function requestFullscreen() {
-    var el = document.documentElement;
+  function isInFullscreen() {
+    return !!(document.fullscreenElement ||
+              document.webkitFullscreenElement ||
+              document.mozFullScreenElement ||
+              document.msFullscreenElement);
+  }
+
+  function tryFullscreen() {
+    const el = document.documentElement;
+
+    // --- Документ (Android, десктоп) ---
+    if (!isInFullscreen()) {
+      try {
+        if (el.requestFullscreen) {
+          el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+        } else if (el.webkitRequestFullscreen) {
+          el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+          el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+          el.msRequestFullscreen();
+        }
+      } catch (e) {}
+    }
+
+    // --- Само видео (iOS и все, кто не умеет document fullscreen) ---
     try {
-      if (el.requestFullscreen)            el.requestFullscreen().catch(function () {});
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      if (video.webkitEnterFullScreen && !video.webkitDisplayingFullscreen) {
+        video.webkitEnterFullScreen();
+      }
     } catch (e) {}
     try {
+      if (video.requestFullscreen && !isInFullscreen() && !video.webkitDisplayingFullscreen) {
+        video.requestFullscreen().catch(() => {});
+      }
+    } catch (e) {}
+
+    // --- Блокировка ориентации ---
+    try {
       if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock("landscape").catch(function () {});
+        screen.orientation.lock("landscape").catch(() => {});
+      } else if (screen.lockOrientation) {
+        screen.lockOrientation("landscape");
+      } else if (screen.mozLockOrientation) {
+        screen.mozLockOrientation("landscape");
+      } else if (screen.msLockOrientation) {
+        screen.msLockOrientation("landscape");
       }
     } catch (e) {}
   }
 
-  /* ---------- Активация по первому действию ---------- */
+  /* ---------- 4. Возврат в fullscreen при выходе ---------- */
 
-  var activated = false;
-
-  function activate() {
-    if (activated) return;
-    activated = true;
-
-    ACTION_EVENTS.forEach(function (name) {
-      document.removeEventListener(name, activate, true);
+  ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"].forEach(evt => {
+    document.addEventListener(evt, () => {
+      if (!isInFullscreen()) {
+        tryFullscreen();
+        setTimeout(tryFullscreen, 30);
+        setTimeout(tryFullscreen, 150);
+        setTimeout(tryFullscreen, 500);
+      }
     });
-
-    requestFullscreen();
-
-    flashing = false;
-    flash.classList.add("hidden");
-
-    video.classList.add("active");
-    setupAudio();
-
-    video.muted = false;
-    video.volume = 1.0;
-
-    var playPromise = video.play();
-    if (playPromise && playPromise.catch) {
-      playPromise.catch(function (err) {
-        console.warn("play() заблокирован:", err);
-        video.muted = true;
-        video.play().then(function () {
-          setTimeout(function () {
-            video.muted = false;
-            if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(function () {});
-          }, 50);
-        }).catch(function (e) {
-          console.error("Повторный play() не удался:", e);
-        });
-      });
-    }
-
-    // video.loop = true;
-  }
-
-  var ACTION_EVENTS = [
-    "touchstart", "touchend",
-    "pointerdown", "pointerup",
-    "mousedown", "click",
-    "keydown"
-  ];
-  ACTION_EVENTS.forEach(function (name) {
-    document.addEventListener(name, activate, { capture: true, passive: true });
   });
 
+  // iOS: видеоплеер вышел из полноэкранного — возвращаем
+  video.addEventListener("webkitendfullscreen", () => {
+    try { video.webkitEnterFullScreen(); } catch (e) {}
+    setTimeout(() => { try { video.webkitEnterFullScreen(); } catch (e) {} }, 100);
+  });
+
+  /* ---------- 5. Активация по первому действию ---------- */
+
+  let activated = false;
+
+  function handleAnyAction() {
+    // Первый раз — запускаем видео
+    if (!activated) {
+      activated = true;
+
+      flashing = false;
+      flash.classList.add("hidden");
+
+      video.classList.add("active");
+      setupAudio();
+
+      video.muted = false;
+      video.volume = 1.0;
+
+      const playPromise = video.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch(err => {
+          console.warn("play() заблокирован:", err);
+          video.muted = true;
+          video.play().then(() => {
+            setTimeout(() => {
+              video.muted = false;
+              if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+            }, 50);
+          }).catch(e => console.error("Повторный play() не удался:", e));
+        });
+      }
+
+      // video.loop = true;
+    }
+
+    // При КАЖДОМ действии — попытка fullscreen
+    tryFullscreen();
+  }
+
+  /* ---------- 6. Все возможные события ---------- */
+
+  const ALL_EVENTS = [
+    // Touch
+    "touchstart", "touchend", "touchmove", "touchcancel", "touchforcechange",
+    // Pointer
+    "pointerdown", "pointerup", "pointermove", "pointercancel",
+    "pointerover", "pointerenter", "pointerleave",
+    // Mouse
+    "mousedown", "mouseup", "click", "dblclick", "contextmenu", "auxclick",
+    // Keyboard
+    "keydown", "keyup", "keypress",
+    // Прочее
+    "wheel", "scroll", "focus", "input", "change",
+    // Жесты (iOS/Safari)
+    "gesturestart", "gesturechange", "gestureend"
+  ];
+
+  ALL_EVENTS.forEach(name => {
+    try {
+      document.addEventListener(name, handleAnyAction, { capture: true, passive: true });
+    } catch (e) {}
+  });
+
+  /* ---------- 7. Попытка заблокировать выход ---------- */
+
+  // Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" || e.key === "Esc" || e.keyCode === 27) {
+      e.preventDefault();
+      e.stopPropagation();
+      tryFullscreen();
+      return false;
+    }
+  }, true);
+
+  // Android back button — заменяем историю, чтобы «назад» не выходило
+  try {
+    history.pushState(null, "", location.href);
+    window.addEventListener("popstate", () => {
+      history.pushState(null, "", location.href);
+      tryFullscreen();
+    });
+  } catch (e) {}
+
+  // Не даём уйти со страницы
+  window.addEventListener("beforeunload", (e) => {
+    if (activated) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  /* ---------- 8. Периодические попытки ---------- */
+
+  setInterval(() => {
+    if (activated) tryFullscreen();
+  }, 1500);
+
+  /* ---------- 9. Предзагрузка ---------- */
   try { video.load(); } catch (e) {}
 
 })();
