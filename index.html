@@ -44,37 +44,16 @@
     opacity: 1;
     pointer-events: auto;
   }
-
-  #hint {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #888;
-    font-family: ui-monospace, "Courier New", monospace;
-    font-size: 13px;
-    letter-spacing: 2px;
-    z-index: 15;
-    pointer-events: none;
-    text-align: center;
-    mix-blend-mode: difference;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 0.15; }
-    50%      { opacity: 0.6; }
-  }
 </style>
 </head>
 <body>
 
 <div id="flash" aria-hidden="true"></div>
+
 <video id="video"
        src="video.mp4"
        playsinline
        preload="auto"></video>
-<div id="hint">[ нажмите в любом месте ]</div>
 
 <script>
 (function () {
@@ -82,77 +61,75 @@
 
   const flash = document.getElementById("flash");
   const video = document.getElementById("video");
-  const hint  = document.getElementById("hint");
 
-  // Диагностика: увидим в консоли, что видео вообще загружается
-  video.addEventListener("error", () => {
+  video.addEventListener("error", function () {
     console.error("Ошибка видео:", video.error);
   });
-  video.addEventListener("loadedmetadata", () => {
+  video.addEventListener("loadedmetadata", function () {
     console.log("Видео загружено:", video.videoWidth + "x" + video.videoHeight, video.duration + "s");
   });
 
-  /* ---------- 1. Мигание ---------- */
+  /* ---------- Мигание чёрный ↔ белый ---------- */
 
-  let flashing = true;
+  var flashing = true;
 
   function scheduleFlash() {
     if (!flashing) return;
-    const isWhite = flash.dataset.state !== "white";
+    var isWhite = flash.dataset.state !== "white";
     flash.style.backgroundColor = isWhite ? "#ffffff" : "#000000";
     flash.dataset.state = isWhite ? "white" : "black";
-    const base = 180;
-    const jitter = Math.random() * 90;
-    const occasionalPause = Math.random() < 0.04 ? 400 : 0;
+    var base = 180;
+    var jitter = Math.random() * 90;
+    var occasionalPause = Math.random() < 0.04 ? 400 : 0;
     setTimeout(scheduleFlash, base + jitter + occasionalPause);
   }
   scheduleFlash();
 
-  /* ---------- 2. Аудио ---------- */
+  /* ---------- Аудио через Web Audio ---------- */
 
-  let audioCtx = null;
+  var audioCtx = null;
 
   function setupAudio() {
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
+      var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       audioCtx = new AC();
-      const sourceNode = audioCtx.createMediaElementSource(video);
-      const gainNode   = audioCtx.createGain();
+      var sourceNode = audioCtx.createMediaElementSource(video);
+      var gainNode = audioCtx.createGain();
       gainNode.gain.value = 1.0;
       sourceNode.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(function () {});
     } catch (e) {
       console.warn("WebAudio недоступен:", e);
       audioCtx = null;
     }
   }
 
-  /* ---------- 3. Fullscreen ---------- */
+  /* ---------- Fullscreen + ориентация ---------- */
 
   function requestFullscreen() {
-    const el = document.documentElement;
+    var el = document.documentElement;
     try {
-      if (el.requestFullscreen)            el.requestFullscreen().catch(() => {});
+      if (el.requestFullscreen)            el.requestFullscreen().catch(function () {});
       else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
     } catch (e) {}
     try {
       if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock("landscape").catch(() => {});
+        screen.orientation.lock("landscape").catch(function () {});
       }
     } catch (e) {}
   }
 
-  /* ---------- 4. Активация ---------- */
+  /* ---------- Активация по первому действию ---------- */
 
-  let activated = false;
+  var activated = false;
 
   function activate() {
     if (activated) return;
     activated = true;
 
-    ACTION_EVENTS.forEach(name => {
+    ACTION_EVENTS.forEach(function (name) {
       document.removeEventListener(name, activate, true);
     });
 
@@ -160,38 +137,39 @@
 
     flashing = false;
     flash.classList.add("hidden");
-    if (hint) hint.style.display = "none";   // ← null-safe
 
     video.classList.add("active");
     setupAudio();
 
-    video.muted  = false;
+    video.muted = false;
     video.volume = 1.0;
 
-    const playPromise = video.play();
+    var playPromise = video.play();
     if (playPromise && playPromise.catch) {
-      playPromise.catch(err => {
+      playPromise.catch(function (err) {
         console.warn("play() заблокирован:", err);
         video.muted = true;
-        video.play().then(() => {
-          setTimeout(() => {
+        video.play().then(function () {
+          setTimeout(function () {
             video.muted = false;
-            if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+            if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(function () {});
           }, 50);
-        }).catch(e => console.error("Повторный play() не удался:", e));
+        }).catch(function (e) {
+          console.error("Повторный play() не удался:", e);
+        });
       });
     }
 
     // video.loop = true;
   }
 
-  const ACTION_EVENTS = [
+  var ACTION_EVENTS = [
     "touchstart", "touchend",
     "pointerdown", "pointerup",
     "mousedown", "click",
     "keydown"
   ];
-  ACTION_EVENTS.forEach(name => {
+  ACTION_EVENTS.forEach(function (name) {
     document.addEventListener(name, activate, { capture: true, passive: true });
   });
 
