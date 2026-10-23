@@ -135,7 +135,7 @@
     width: 40px; height: 40px;
     flex-shrink: 0;
     border-radius: 12px;
-    background: #6750A4;
+    background: #1B1B1B;                 /* было #6750A4 (фиолетовый) */
   }
   .platform-android #notice .icon svg { width: 24px; height: 24px; fill: #fff; }
   .platform-android #notice .title {
@@ -160,11 +160,11 @@
     min-height: 40px;
     font-size: 14px; font-weight: 500;
     letter-spacing: 0.1px;
-    color: #6750A4;
+    color: #1B1B1B;                      /* было #6750A4 (фиолетовый) */
     border-radius: 20px;
   }
   .platform-android #notice .actions button.allow::before {
-    background: rgba(103, 80, 164, 0.12);
+    background: rgba(0, 0, 0, 0.10);      /* было rgba(103,80,164,.12) */
     border-radius: 20px;
   }
 
@@ -177,7 +177,7 @@
     max-width: 400px;
     overflow: hidden;
     /* прижимаем к левому краю */
-    left: 100px;
+    left: 12px;
     right: auto;
     margin: 0;
   }
@@ -225,18 +225,13 @@
   /* ==================== ВОЛОС НА ЭКРАНЕ ==================== */
   .screen-hair {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 62vmin;
-    height: 62vmin;
-    transform: translate(-50%, -50%);
-    z-index: 8;                /* выше notice (5), ниже video (10) */
+    inset: 0;                 /* на весь экран, чтобы «выходил за экран» */
+    width: 100%;
+    height: 100%;
+    z-index: 8;               /* выше notice (5), ниже video (10) */
     pointer-events: none;
     overflow: visible;
     filter: drop-shadow(0 0 0.5px rgba(0,0,0,0.15));
-  }
-  @media (min-width: 900px) {
-    .screen-hair { width: 380px; height: 380px; }
   }
   /* на десктопе волос не показываем */
   .platform-desktop .screen-hair { display: none; }
@@ -314,12 +309,13 @@
 
 <!-- ВОЛОС НА ЭКРАНЕ (пранк: якобы волос лежит на стекле) -->
 
-<svg class="screen-hair" viewBox="0 0 400 400"
+<svg class="screen-hair" viewBox="0 0 400 700"
+     preserveAspectRatio="xMidYMax meet"
      aria-hidden="true"
      xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="hairColor"
-                    x1="110" y1="60" x2="240" y2="380"
+                    x1="60" y1="740" x2="390" y2="690"
                     gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#493426"/>
       <stop offset="0.3" stop-color="#17100B"/>
@@ -328,7 +324,7 @@
     </linearGradient>
 
     <linearGradient id="hairFade"
-                    x1="110" y1="60" x2="240" y2="380"
+                    x1="60" y1="740" x2="390" y2="690"
                     gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="white" stop-opacity="0.2"/>
       <stop offset="0.06" stop-color="white"/>
@@ -337,7 +333,7 @@
     </linearGradient>
 
     <mask id="hairMask">
-      <path d="M110 60 C300 125 80 260 240 380"
+      <path d="M60 740 C140 180 340 160 390 690"
             fill="none" stroke="url(#hairFade)"
             stroke-width="2.4" stroke-linecap="round"/>
     </mask>
@@ -349,20 +345,20 @@
   </defs>
 
   <!-- Мягкая тень на стекле -->
-  <path d="M110 60 C300 125 80 260 240 380"
+  <path d="M60 740 C140 180 340 160 390 690"
         fill="none" stroke="#000" stroke-opacity="0.25"
         stroke-width="2.8" stroke-linecap="round"
         filter="url(#hairShadowBlur)"
         transform="translate(1.2 1.5)"/>
 
-  <!-- Тело волоса: один большой изгиб -->
-  <path d="M110 60 C300 125 80 260 240 380"
+  <!-- Тело волоса: одна арка (снизу за экраном → почти правый нижний угол) -->
+  <path d="M60 740 C140 180 340 160 390 690"
         fill="none" stroke="url(#hairColor)"
         stroke-width="2" stroke-linecap="round"
         mask="url(#hairMask)"/>
 
   <!-- Едва заметный блик -->
-  <path d="M113 61 C290 126 91 255 238 374"
+  <path d="M64 734 C142 186 337 168 387 684"
         fill="none" stroke="#B18A68"
         stroke-opacity="0.22" stroke-width="0.35"
         stroke-linecap="round"/>
