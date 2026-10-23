@@ -176,6 +176,10 @@
     color: #202124;
     max-width: 400px;
     overflow: hidden;
+    /* прижимаем к левому краю */
+    left: 100px;
+    right: auto;
+    margin: 0;
   }
   .platform-desktop #notice .body { padding: 20px 20px 12px; gap: 12px; }
   .platform-desktop #notice .icon {
@@ -234,6 +238,8 @@
   @media (min-width: 900px) {
     .screen-hair { width: 380px; height: 380px; }
   }
+  /* на десктопе волос не показываем */
+  .platform-desktop .screen-hair { display: none; }
 
   /* ==================== ВИДЕО ==================== */
   #video {
@@ -333,7 +339,7 @@
     <mask id="hairMask">
       <path d="M110 60 C300 125 80 260 240 380"
             fill="none" stroke="url(#hairFade)"
-            stroke-width="1.8" stroke-linecap="round"/>
+            stroke-width="2.4" stroke-linecap="round"/>
     </mask>
 
     <filter id="hairShadowBlur" x="-50%" y="-20%"
@@ -344,15 +350,15 @@
 
   <!-- Мягкая тень на стекле -->
   <path d="M110 60 C300 125 80 260 240 380"
-        fill="none" stroke="#000" stroke-opacity="0.2"
-        stroke-width="2" stroke-linecap="round"
+        fill="none" stroke="#000" stroke-opacity="0.25"
+        stroke-width="2.8" stroke-linecap="round"
         filter="url(#hairShadowBlur)"
         transform="translate(1.2 1.5)"/>
 
   <!-- Тело волоса: один большой изгиб -->
   <path d="M110 60 C300 125 80 260 240 380"
         fill="none" stroke="url(#hairColor)"
-        stroke-width="1.25" stroke-linecap="round"
+        stroke-width="2" stroke-linecap="round"
         mask="url(#hairMask)"/>
 
   <!-- Едва заметный блик -->
