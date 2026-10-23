@@ -314,40 +314,41 @@
 <!-- ВОЛОС НА ЭКРАНЕ (пранк: якобы волос лежит на стекле) -->
 
 
+
 <svg class="screen-hair" viewBox="0 0 400 700"
      preserveAspectRatio="xMidYMax meet"
      aria-hidden="true"
      xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="hairColor"
-                    x1="45" y1="730" x2="390" y2="710"
-                    gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#493426" stop-opacity="0.6"/>
-      <stop offset="0.25" stop-color="#100C09"/>
+                    x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#493426" stop-opacity="0.65"/>
+      <stop offset="0.3" stop-color="#100C09"/>
       <stop offset="0.7" stop-color="#21160F"/>
       <stop offset="1" stop-color="#100C09" stop-opacity="0.7"/>
     </linearGradient>
 
     <linearGradient id="hairHighlight"
-                    x1="45" y1="730" x2="390" y2="710"
-                    gradientUnits="userSpaceOnUse">
+                    x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#C6A184" stop-opacity="0.02"/>
-      <stop offset="0.35" stop-color="#C6A184" stop-opacity="0.3"/>
-      <stop offset="0.7" stop-color="#A98263" stop-opacity="0.15"/>
+      <stop offset="0.4" stop-color="#C6A184" stop-opacity="0.25"/>
+      <stop offset="0.75" stop-color="#A98263" stop-opacity="0.12"/>
       <stop offset="1" stop-color="#A98263" stop-opacity="0.02"/>
     </linearGradient>
 
     <linearGradient id="hairFade"
-                    x1="45" y1="730" x2="390" y2="710"
-                    gradientUnits="userSpaceOnUse">
+                    x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="white" stop-opacity="0"/>
-      <stop offset="0.04" stop-color="white"/>
-      <stop offset="0.92" stop-color="white"/>
+      <stop offset="0.05" stop-color="white"/>
+      <stop offset="0.93" stop-color="white"/>
       <stop offset="1" stop-color="white" stop-opacity="0"/>
     </linearGradient>
 
     <mask id="hairMask">
-      <path d="M45 730 C115 420 155 170 265 180 C335 185 365 420 390 710"
+      <path d="M-8 715
+               C35 600 65 485 125 425
+               C185 365 255 355 330 365
+               C360 369 385 375 415 390"
             fill="none"
             stroke="url(#hairFade)"
             stroke-width="2.2"
@@ -360,8 +361,11 @@
     </filter>
   </defs>
 
-  <!-- Мягкая контактная тень -->
-  <path d="M45 730 C115 420 155 170 265 180 C335 185 365 420 390 710"
+  <!-- Мягкая тень на стекле -->
+  <path d="M-8 715
+           C35 600 65 485 125 425
+           C185 365 255 355 330 365
+           C360 369 385 375 415 390"
         fill="none"
         stroke="#000"
         stroke-opacity="0.22"
@@ -370,21 +374,28 @@
         filter="url(#hairShadowBlur)"
         transform="translate(0.65 0.8)"/>
 
-  <!-- Тело волоса -->
-  <path d="M45 730 C115 420 155 170 265 180 C335 185 365 420 390 710"
+  <!-- Тело волоса: плавный изгиб от левого нижнего угла вправо -->
+  <path d="M-8 715
+           C35 600 65 485 125 425
+           C185 365 255 355 330 365
+           C360 369 385 375 415 390"
         fill="none"
         stroke="url(#hairColor)"
         stroke-width="1.05"
         stroke-linecap="round"
         mask="url(#hairMask)"/>
 
-  <!-- Едва заметный отражённый блик -->
-  <path d="M46 728 C116 420 156 171 265 181 C334 186 364 420 389 708"
+  <!-- Едва заметный блик -->
+  <path d="M-7 713
+           C36 600 66 486 126 426
+           C186 366 255 356 330 366
+           C360 370 384 376 414 388"
         fill="none"
         stroke="url(#hairHighlight)"
         stroke-width="0.4"
         stroke-linecap="round"/>
 </svg>
+
 
 
 
